@@ -17,7 +17,13 @@ export async function GET() {
       .eq('user_id', session.user.id)
       .order('created_at', { ascending: false })
 
-    if (error) throw error
+    if (error) {
+      console.error('Error fetching achievements:', error)
+      return NextResponse.json(
+        { error: error.message },
+        { status: 500 }
+      )
+    }
 
     return NextResponse.json(achievements)
   } catch (error) {

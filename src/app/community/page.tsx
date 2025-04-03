@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardFooter, CardHeader } from "@/components/ui/card"
 import { Textarea } from "@/components/ui/textarea"
 import { useEffect, useState } from "react"
+import Image from 'next/image'
 
 interface Post {
   id: string
@@ -107,10 +108,12 @@ export default function CommunityPage() {
           {posts.map((post) => (
             <Card key={post.id}>
               <CardHeader className="flex items-center space-x-4">
-                <img
-                  src={post.users.image || '/default-avatar.png'}
-                  alt={post.users.name}
-                  className="h-10 w-10 rounded-full"
+                <Image
+                  src={post.users?.image || '/default-avatar.png'}
+                  alt={post.users?.name || 'User'}
+                  width={40}
+                  height={40}
+                  className="rounded-full"
                 />
                 <div>
                   <h3 className="font-semibold">{post.users.name}</h3>

@@ -12,8 +12,9 @@ interface Exercise {
 
 export async function GET(
   request: Request,
-  { params }: { params: { id: string } }
+  context: { params: Promise<{ id: string }> }
 ) {
+  const { id } = await context.params
   try {
     const supabase = createRouteHandlerClient({ cookies })
     const { data: { session } } = await supabase.auth.getSession()
@@ -28,7 +29,7 @@ export async function GET(
         *,
         exercises (*)
       `)
-      .eq('id', params.id)
+      .eq('id', id)
       .eq('user_id', session.user.id)
       .single()
 
@@ -46,8 +47,9 @@ export async function GET(
 
 export async function PUT(
   request: Request,
-  { params }: { params: { id: string } }
+  context: { params: Promise<{ id: string }> }
 ) {
+  const { id } = await context.params
   try {
     const supabase = createRouteHandlerClient({ cookies })
     const { data: { session } } = await supabase.auth.getSession()
@@ -58,7 +60,6 @@ export async function PUT(
 
     const workoutData = await request.json()
 
-    // Validate required fields
     if (!workoutData.title || !workoutData.exercises || workoutData.exercises.length === 0) {
       return NextResponse.json(
         { error: 'Title and at least one exercise are required' },
@@ -66,7 +67,6 @@ export async function PUT(
       )
     }
 
-    // Update workout
     const { data: workout, error: workoutError } = await supabase
       .from('workouts')
       .update({
@@ -76,7 +76,7 @@ export async function PUT(
         calories: workoutData.calories,
         level: workoutData.level,
       })
-      .eq('id', params.id)
+      .eq('id', id)
       .eq('user_id', session.user.id)
       .select()
       .single()
@@ -89,11 +89,10 @@ export async function PUT(
       )
     }
 
-    // Delete existing exercises
     const { error: deleteError } = await supabase
       .from('exercises')
       .delete()
-      .eq('workout_id', params.id)
+      .eq('workout_id', id)
 
     if (deleteError) {
       console.error('Error deleting exercises:', deleteError)
@@ -103,9 +102,8 @@ export async function PUT(
       )
     }
 
-    // Insert new exercises
     const exercisesToInsert = workoutData.exercises.map((exercise: Exercise) => ({
-      workout_id: params.id,
+      workout_id: id,
       name: exercise.name,
       sets: exercise.sets,
       reps: exercise.reps,
@@ -124,26 +122,22 @@ export async function PUT(
       )
     }
 
-    // If sharing to community, create a post
     if (workoutData.share_to_community) {
       try {
-        // Format exercises list
         const exercisesList = workoutData.exercises
           .map((exercise: Exercise) => 
             `• ${exercise.name}: ${exercise.sets} sets × ${exercise.reps} reps${exercise.weight ? ` (${exercise.weight}kg)` : ''}`
           )
           .join('\n')
 
-        // Create the post content with workout details
         const postContent = `🏋️‍♂️ Updated Workout: ${workoutData.title}\n\n${workoutData.description}\n\n💪 Exercises:\n${exercisesList}\n\n⏱️ Duration: ${workoutData.duration} minutes\n🔥 Calories: ${workoutData.calories}\n📈 Level: ${workoutData.level}\n\nTry this updated workout and let me know what you think! 💪`
 
-        // Insert the post
         const { data: post, error: postError } = await supabase
           .from('posts')
           .insert({
             user_id: session.user.id,
             content: postContent,
-            workout_id: params.id,
+            workout_id: id,
           })
           .select(`
             *,
@@ -160,13 +154,11 @@ export async function PUT(
 
         if (postError) {
           console.error('Post creation error:', postError)
-          // Log the error but don't fail the workout update
         } else {
           console.log('Successfully created community post:', post)
         }
       } catch (error) {
         console.error('Error creating community post:', error)
-        // Log the error but don't fail the workout update
       }
     }
 
@@ -182,8 +174,9 @@ export async function PUT(
 
 export async function DELETE(
   request: Request,
-  { params }: { params: { id: string } }
+  context: { params: Promise<{ id: string }> }
 ) {
+  const { id } = await context.params
   try {
     const supabase = createRouteHandlerClient({ cookies })
     const { data: { session } } = await supabase.auth.getSession()
@@ -192,11 +185,10 @@ export async function DELETE(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    // Delete exercises first (due to foreign key constraint)
     const { error: exercisesError } = await supabase
       .from('exercises')
       .delete()
-      .eq('workout_id', params.id)
+      .eq('workout_id', id)
 
     if (exercisesError) {
       console.error('Error deleting exercises:', exercisesError)
@@ -206,11 +198,10 @@ export async function DELETE(
       )
     }
 
-    // Delete workout
     const { error: workoutError } = await supabase
       .from('workouts')
       .delete()
-      .eq('id', params.id)
+      .eq('id', id)
       .eq('user_id', session.user.id)
 
     if (workoutError) {
